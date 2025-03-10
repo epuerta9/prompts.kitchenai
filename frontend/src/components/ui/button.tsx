@@ -1,38 +1,42 @@
-import React from 'react';
+'use client';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'outline' | 'ghost';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
-  children: React.ReactNode;
+import * as React from 'react';
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'default' | 'outline' | 'ghost' | 'link';
+  size?: 'default' | 'sm' | 'lg';
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = '', variant = 'default', size = 'default', children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50';
-    
-    const variantStyles = {
-      default: 'bg-blue-600 text-white hover:bg-blue-700',
-      outline: 'border border-slate-200 bg-white hover:bg-slate-100 hover:text-slate-900',
-      ghost: 'hover:bg-slate-100 hover:text-slate-900',
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className = '', variant = 'default', size = 'default', ...props }, ref) => {
+    const variantClasses = {
+      default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+      ghost: 'hover:bg-accent hover:text-accent-foreground',
+      link: 'text-primary underline-offset-4 hover:underline',
     };
-    
-    const sizeStyles = {
-      default: 'h-10 py-2 px-4',
-      sm: 'h-8 px-3 text-sm',
-      lg: 'h-12 px-6',
-      icon: 'h-10 w-10',
+
+    const sizeClasses = {
+      default: 'h-10 px-4 py-2',
+      sm: 'h-9 rounded-md px-3',
+      lg: 'h-11 rounded-md px-8',
     };
-    
-    const combinedClassName = `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
-    
+
     return (
-      <button className={combinedClassName} ref={ref} {...props}>
-        {children}
-      </button>
+      <button
+        ref={ref}
+        className={`
+          inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background 
+          transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring 
+          focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 
+          ${variantClasses[variant]} ${sizeClasses[size]} ${className}
+        `}
+        {...props}
+      />
     );
   }
 );
 
 Button.displayName = 'Button';
 
-export default Button; 
+export { Button }; 
