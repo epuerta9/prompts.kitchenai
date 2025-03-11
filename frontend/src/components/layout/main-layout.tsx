@@ -19,6 +19,7 @@ import {
   List,
   Activity
 } from 'lucide-react';
+import { UserMenu } from '../UserMenu';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -83,7 +84,7 @@ function NavSection({ title, children, collapsed }: { title: string; children: R
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const pathname = usePathname();
+  const pathname = usePathname() || '';
   const [collapsed, setCollapsed] = React.useState(false);
 
   return (
@@ -93,9 +94,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <span className="text-xl">Prompts.KitchenAI</span>
         </Link>
         <div className="ml-auto flex items-center gap-4">
-          <Link href="/settings" className="text-sm hover:text-slate-300">
-            Settings
-          </Link>
+          <UserMenu />
         </div>
       </header>
       <div className="flex flex-1 overflow-hidden">

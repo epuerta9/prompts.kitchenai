@@ -3,15 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { 
-  Prompt, 
-  Message, 
-  Version, 
-  getPrompt, 
-  getVersions, 
-  createVersion, 
-  runPrompt 
-} from '@/lib/api';
+import { Prompt, Message, Version } from '@/lib/types';
+import { getPrompt, createVersion } from '@/lib/mock-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,8 +21,11 @@ import {
   Plus,
   Trash2,
   Check,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react';
+import { Dialog } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Mock data for a prompt
 const mockPrompt: Prompt = {
@@ -42,7 +38,35 @@ const mockPrompt: Prompt = {
     email: 'john@example.com'
   },
   created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString()
+  updated_at: new Date().toISOString(),
+  versions: [
+    {
+      id: 'version-1',
+      prompt_id: 'prompt-1',
+      version: 1,
+      messages: [
+        {
+          role: 'system',
+          content: 'you are a helpful assistant with a pirate accent'
+        },
+        {
+          role: 'user',
+          content: 'help me get store details'
+        },
+        {
+          role: 'assistant',
+          content: 'Arr matey! I be the helpful assistant ye requested. Here be the store details ye asked for...'
+        }
+      ],
+      created_by: {
+        id: 'user1',
+        name: 'John Doe',
+        email: 'john@example.com'
+      },
+      created_at: new Date().toISOString()
+    }
+  ],
+  current_version: 1
 };
 
 // Mock data for versions
@@ -187,9 +211,174 @@ function MessageEditor({
   );
 }
 
+function CreateVersionDialog({ prompt, onSuccess }: { prompt: Prompt; onSuccess: () => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [systemMessage, setSystemMessage] = useState('');
+  const [userMessage, setUserMessage] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    // Pre-fill with current version's messages
+    const currentVersion = prompt?.versions?.find(v => v.version === prompt.current_version);
+    if (currentVersion) {
+      setSystemMessage(currentVersion.messages.find(m => m.role === 'system')?.content || '');
+      setUserMessage(currentVersion.messages.find(m => m.role === 'user')?.content || '');
+    }
+  }, [prompt]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!systemMessage.trim() || !userMessage.trim()) {
+      toast.error('Please fill in all message fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const messages: Message[] = [
+        {
+          role: 'system',
+          content: systemMessage
+        },
+        {
+          role: 'user',
+          content: userMessage
+        }
+      ];
+
+      const result = await createVersion(prompt.id, {
+        messages,
+        notes: notes.trim() || undefined
+      });
+      
+      if (result) {
+        toast.success('Version created successfully');
+        setIsOpen(false);
+        setNotes('');
+        onSuccess();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create version';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <Button onClick={() => setIsOpen(true)}>
+        <Plus className="mr-2 h-4 w-4" />
+        New Version
+      </Button>
+      
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-2xl rounded-lg bg-white p-6">
+            <h2 className="mb-4 text-xl font-semibold">Create New Version</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium">System Message</label>
+                <Textarea
+                  value={systemMessage}
+                  onChange={(e) => setSystemMessage(e.target.value)}
+                  placeholder="Enter system message"
+                  className="min-h-[100px]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">User Message Template</label>
+                <Textarea
+                  value={userMessage}
+                  onChange={(e) => setUserMessage(e.target.value)}
+                  placeholder="Enter user message template"
+                  className="min-h-[100px]"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Version Notes (Optional)</label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Describe what changed in this version"
+                  className="min-h-[80px]"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Creating...' : 'Create Version'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Dialog>
+    </>
+  );
+}
+
+function VersionCard({ version }: { version: Version }) {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Version {version.version}</CardTitle>
+          <span className="text-sm text-slate-500">{formatDate(version.created_at)}</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {version.notes && (
+          <div className="mb-4">
+            <h4 className="mb-1 text-sm font-medium text-slate-700">Notes</h4>
+            <p className="text-sm text-slate-600">{version.notes}</p>
+          </div>
+        )}
+        <div className="space-y-4">
+          {version.messages.map((message, index) => (
+            <div key={index} className="space-y-1">
+              <h4 className="text-sm font-medium capitalize text-slate-700">
+                {message.role} Message
+              </h4>
+              <pre className="whitespace-pre-wrap break-words rounded bg-slate-50 p-3 text-sm">
+                {message.content}
+              </pre>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function PromptPage() {
   const params = useParams();
   const router = useRouter();
+  
+  if (!params?.id) {
+    router.push('/prompts');
+    return null;
+  }
+  
   const promptId = params.id as string;
   
   const [prompt, setPrompt] = useState<Prompt | null>(null);
@@ -377,287 +566,33 @@ export default function PromptPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">{prompt.title}</h1>
-          {activeVersion && (
-            <div className="text-sm text-slate-500">v{activeVersion.version}</div>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <div className={`h-2 w-2 rounded-full ${allChangesAreSaved ? 'bg-green-500' : 'bg-amber-500'}`}></div>
-          <span className="text-sm text-slate-500">
-            {allChangesAreSaved ? 'All changes saved' : 'Unsaved changes'}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => router.push('/prompts')}>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => router.push('/prompts')}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleSaveChanges} 
-            disabled={allChangesAreSaved}
-          >
-            <Save className="mr-1 h-4 w-4" />
-            Save
-          </Button>
-          <Button 
-            size="sm" 
-            onClick={handleCommitVersion}
-            disabled={isCommitting || !allChangesAreSaved}
-          >
-            {isCommitting ? (
-              <>
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Committing...
-              </>
-            ) : (
-              <>
-                <Check className="mr-1 h-4 w-4" />
-                Commit
-              </>
-            )}
-          </Button>
+          <h1 className="text-2xl font-bold">{prompt.title}</h1>
         </div>
+        <CreateVersionDialog prompt={prompt} onSuccess={() => {}} />
       </div>
       
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-8">
-          <Tabs defaultValue="single">
-            <div className="mb-4 border-b">
-              <Tabs.List>
-                <Tabs.Trigger value="single">Single Prompt</Tabs.Trigger>
-                <Tabs.Trigger value="compare">Compare Multiple</Tabs.Trigger>
-              </Tabs.List>
-            </div>
-            
-            <Tabs.Content value="single" className="space-y-4">
-              {editableMessages.map((message, index) => (
-                <MessageEditor
-                  key={index}
-                  role={message.role}
-                  content={message.content}
-                  onChange={(content) => handleMessageChange(index, content)}
-                  onDelete={editableMessages.length > 1 ? () => handleDeleteMessage(index) : undefined}
-                />
-              ))}
-              
-              <div className="flex justify-end space-x-2">
-                <div className="dropdown relative">
-                  <Button variant="outline" size="sm">
-                    <MessageSquare className="mr-1 h-4 w-4" />
-                    Add Message
-                    <ChevronDown className="ml-1 h-4 w-4" />
-                  </Button>
-                  <div className="dropdown-menu absolute right-0 top-full z-10 mt-1 hidden w-48 rounded-md border bg-white shadow-lg group-hover:block">
-                    <ul className="py-1">
-                      <li 
-                        className="flex cursor-pointer items-center px-4 py-2 text-sm hover:bg-slate-100"
-                        onClick={() => handleAddMessage('system')}
-                      >
-                        Add System Message
-                      </li>
-                      <li 
-                        className="flex cursor-pointer items-center px-4 py-2 text-sm hover:bg-slate-100"
-                        onClick={() => handleAddMessage('user')}
-                      >
-                        Add User Message
-                      </li>
-                      <li 
-                        className="flex cursor-pointer items-center px-4 py-2 text-sm hover:bg-slate-100"
-                        onClick={() => handleAddMessage('assistant')}
-                      >
-                        Add Assistant Message
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-              
-              {!allChangesAreSaved && (
-                <div className="mt-4 flex items-center rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-                  <AlertCircle className="mr-2 h-4 w-4" />
-                  You have unsaved changes. Click "Save" to save your changes or "Commit" to create a new version.
-                </div>
-              )}
-            </Tabs.Content>
-            
-            <Tabs.Content value="compare">
-              <div className="flex h-64 flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-                <p className="text-slate-500">Compare multiple prompt versions here</p>
-              </div>
-            </Tabs.Content>
-          </Tabs>
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="mb-2 text-lg font-semibold">About this Prompt</h2>
+        <p className="text-slate-600">{prompt.description}</p>
+      </div>
+
+      <div>
+        <div className="mb-4 flex items-center gap-2">
+          <History className="h-5 w-5" />
+          <h2 className="text-lg font-semibold">Version History</h2>
         </div>
-        
-        <div className="col-span-4 space-y-4">
-          <div className="rounded-lg border">
-            <div className="border-b bg-slate-50 p-3">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">Test Prompt</div>
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1"
-                    onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                  >
-                    {selectedModel.name}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                  
-                  {isModelDropdownOpen && (
-                    <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded-md border bg-white shadow-lg">
-                      <ul className="py-1">
-                        {models.map((model) => (
-                          <li
-                            key={model.id}
-                            className={`
-                              cursor-pointer px-4 py-2 text-sm hover:bg-slate-100
-                              ${selectedModel.id === model.id ? 'bg-slate-50 font-medium' : ''}
-                            `}
-                            onClick={() => {
-                              setSelectedModel(model);
-                              setIsModelDropdownOpen(false);
-                            }}
-                          >
-                            {model.name}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="p-3">
-              <Button 
-                className="w-full"
-                onClick={handleRunPrompt}
-                disabled={isRunning}
-              >
-                {isRunning ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    Run
-                  </>
-                )}
-              </Button>
-              
-              <div className="mt-4 rounded-md bg-slate-50 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="text-sm font-medium">Response</div>
-                  {modelResponse && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(modelResponse);
-                        toast.success('Response copied to clipboard');
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-                {modelResponse ? (
-                  <pre className="max-h-[300px] overflow-auto whitespace-pre-wrap text-sm">{modelResponse}</pre>
-                ) : (
-                  <div className="py-8 text-center text-sm text-slate-500">
-                    Run the prompt to see the response
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="rounded-lg border">
-            <div className="border-b bg-slate-50 p-3">
-              <div className="font-medium">Settings</div>
-            </div>
-            <div className="p-3">
-              <div className="space-y-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Temperature</label>
-                  <div className="flex items-center gap-2">
-                    <Input 
-                      type="range" 
-                      min="0" 
-                      max="2" 
-                      step="0.1" 
-                      value={temperature}
-                      onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                      className="flex-1"
-                    />
-                    <span className="w-10 text-center text-sm">{temperature}</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Max Tokens</label>
-                  <Input 
-                    type="number" 
-                    min="1" 
-                    value={maxTokens}
-                    onChange={(e) => setMaxTokens(parseInt(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Top P</label>
-                  <div className="flex items-center gap-2">
-                    <Input 
-                      type="range" 
-                      min="0" 
-                      max="1" 
-                      step="0.01" 
-                      value={topP}
-                      onChange={(e) => setTopP(parseFloat(e.target.value))}
-                      className="flex-1"
-                    />
-                    <span className="w-10 text-center text-sm">{topP}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="rounded-lg border">
-            <div className="border-b bg-slate-50 p-3">
-              <div className="font-medium">Version History</div>
-            </div>
-            <div className="p-3">
-              <div className="max-h-[200px] space-y-2 overflow-auto">
-                {versions.map((version) => (
-                  <div 
-                    key={version.id}
-                    className={`
-                      flex items-center justify-between rounded-md p-2
-                      ${activeVersion?.id === version.id ? 'bg-slate-100' : 'hover:bg-slate-50'}
-                    `}
-                  >
-                    <div>
-                      <div className="font-medium">v{version.version}</div>
-                      <div className="text-xs text-slate-500">
-                        {new Date(version.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleSwitchVersion(version)}
-                      disabled={activeVersion?.id === version.id}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        <div className="space-y-4">
+          {prompt.versions
+            .slice()
+            .reverse()
+            .map((version) => (
+              <VersionCard key={version.id} version={version} />
+            ))}
         </div>
       </div>
     </div>
