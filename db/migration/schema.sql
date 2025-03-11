@@ -1,47 +1,42 @@
--- Create users table
-CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Create prompts table
 CREATE TABLE IF NOT EXISTS prompts (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
-    description TEXT,
-    created_by TEXT REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    description TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
 );
 
--- Create prompt_versions table
-CREATE TABLE IF NOT EXISTS prompt_versions (
+-- Create versions table
+CREATE TABLE IF NOT EXISTS versions (
     id TEXT PRIMARY KEY,
-    prompt_id TEXT REFERENCES prompts(id),
+    prompt_id TEXT NOT NULL,
     version INTEGER NOT NULL,
-    content TEXT NOT NULL,
-    created_by TEXT REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(prompt_id, version)
+    messages JSON NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE CASCADE,
+    UNIQUE (prompt_id, version)
 );
 
 -- Create comments table
 CREATE TABLE IF NOT EXISTS comments (
     id TEXT PRIMARY KEY,
-    prompt_id TEXT REFERENCES prompts(id),
+    prompt_id TEXT NOT NULL,
     content TEXT NOT NULL,
-    created_by TEXT REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_by TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
 );
 
 -- Create evaluations table
 CREATE TABLE IF NOT EXISTS evaluations (
     id TEXT PRIMARY KEY,
-    prompt_version_id TEXT REFERENCES prompt_versions(id),
-    score REAL,
+    version_id TEXT NOT NULL,
+    score REAL NOT NULL,
     notes TEXT,
-    created_by TEXT REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_by TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (version_id) REFERENCES versions(id) ON DELETE CASCADE
 ); 

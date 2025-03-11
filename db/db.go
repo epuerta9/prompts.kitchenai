@@ -13,8 +13,8 @@ import (
 
 // Store provides all functions to execute database queries and transactions
 type Store struct {
-	db *sql.DB
 	*sqlc.Queries
+	db *sql.DB
 }
 
 // NewStore creates a new store with the given database connection

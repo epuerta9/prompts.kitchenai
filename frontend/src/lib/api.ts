@@ -26,6 +26,11 @@ export interface User {
   created_at?: string;
 }
 
+export interface Message {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
 export interface Prompt {
   id: string;
   title: string;
@@ -41,7 +46,7 @@ export interface Version {
   id: string;
   prompt_id: string;
   version: number;
-  content: string;
+  messages: Message[];
   created_by: User;
   created_at?: string;
   evals?: Eval[];
@@ -62,6 +67,24 @@ export interface Eval {
   notes: string;
   created_by: User;
   created_at?: string;
+}
+
+export interface RunPromptRequest {
+  messages: Message[];
+  model: string;
+  temperature?: number;
+  max_tokens?: number;
+  top_p?: number;
+}
+
+export interface RunPromptResponse {
+  response: string;
+  model: string;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 // Prompts
@@ -125,17 +148,7 @@ export const getVersions = async (promptId: string): Promise<Version[]> => {
   }
 };
 
-export const getVersion = async (promptId: string, version: number): Promise<Version> => {
-  try {
-    const response: Version = await api.get(`/prompts/${promptId}/versions/${version}`);
-    return response;
-  } catch (error) {
-    console.error('API Error - getVersion:', error);
-    throw error;
-  }
-};
-
-export const createVersion = async (promptId: string, version: Partial<Version>): Promise<Version> => {
+export const createVersion = async (promptId: string, version: { messages: Message[], created_by: User }): Promise<Version> => {
   try {
     const response: Version = await api.post(`/prompts/${promptId}/versions`, version);
     return response;
@@ -187,6 +200,17 @@ export const getEvaluations = async (promptId: string, version: number): Promise
     return Array.isArray(response) ? response : [];
   } catch (error) {
     console.error('API Error - getEvaluations:', error);
+    throw error;
+  }
+};
+
+// Run prompt
+export const runPrompt = async (request: RunPromptRequest): Promise<RunPromptResponse> => {
+  try {
+    const response: RunPromptResponse = await api.post('/run', request);
+    return response;
+  } catch (error) {
+    console.error('API Error - runPrompt:', error);
     throw error;
   }
 };
